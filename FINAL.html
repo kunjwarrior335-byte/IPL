@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate IPL Auction Simulator</title>
+    <style>
+        /* --- Base Theme & Reset --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #0f0f0f; color: #ffffff; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden; }
+
+        /* --- Start Screen --- */
+        #start-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
+        .start-btn-massive { background: #ff9800; color: #000; font-size: 2rem; padding: 20px 40px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: transform 0.2s; box-shadow: 0 0 20px rgba(255, 152, 0, 0.5); }
+        .start-btn-massive:hover { transform: scale(1.05); }
+
+        /* --- Header --- */
+        header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; background-color: #141414; border-bottom: 1px solid #2a2a2a; }
+        .purse-info { color: #ffcc00; font-weight: bold; font-size: 1.2rem; }
+
+        /* --- Main Layout (3 Columns) --- */
+        main { width: 100%; max-width: 1200px; padding: 20px; display: grid; grid-template-columns: 2fr 1fr 1.2fr; gap: 20px; display: none; }
+        .card { background-color: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; }
+        .card-header { font-size: 0.9rem; color: #fff; margin-bottom: 10px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 10px;}
+
+        /* --- Left Side: Player Card --- */
+        .player-card { text-align: center; padding: 30px; background: linear-gradient(145deg, #1a1a1a, #111); border: 2px solid #333; border-radius: 12px; position: relative; }
+        .player-photo { width: 120px; height: 120px; background-color: #333; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; font-size: 3rem; border: 3px solid #ff9800; }
+        .player-name { font-size: 2.2rem; font-weight: bold; color: #fff; margin-bottom: 5px; }
+        .player-details { color: #aaa; font-size: 1rem; margin-bottom: 20px; }
+        
+        /* --- Bidding Area & Timer --- */
+        .bid-status { background-color: #000; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #333; position: relative; overflow: hidden; }
+        .current-bid-amount { font-size: 3rem; color: #ffcc00; font-weight: bold; margin: 5px 0; transition: transform 0.1s; }
+        .highest-bidder { color: #4ade80; font-size: 1.3rem; font-weight: bold; }
+        
+        .timer-bar-container { width: 100%; height: 5px; background: #333; margin-top: 15px; border-radius: 5px; }
+        .timer-bar { height: 100%; width: 100%; background: #ff4757; transition: width 0.1s linear; }
+
+        /* --- Controls --- */
+        .controls-row { display: flex; gap: 10px; }
+        .bid-btn { flex: 2; padding: 15px; border: none; border-radius: 8px; font-size: 1.2rem; font-weight: bold; cursor: pointer; background-color: #ff9800; color: #000; transition: 0.2s; }
+        .bid-btn:hover { background-color: #e68a00; }
+        .bid-btn:disabled { background-color: #555; color: #888; cursor: not-allowed; }
+        
+        .skip-btn { flex: 1; background-color: #dc2626; color: #fff; }
+        .skip-btn:hover { background-color: #b91c1c; }
+        .skip-btn:disabled { background-color: #333; color: #555; }
+
+        /* --- Middle Column: Purses & Logs --- */
+        .team-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; flex-grow: 1; }
+        .team-row { display: flex; justify-content: space-between; background-color: #222; padding: 8px 12px; border-radius: 5px; font-size: 0.85rem; border-left: 4px solid #555; }
+        .team-row.csk { border-left-color: #eab308; background-color: rgba(234, 179, 8, 0.1); font-weight: bold; }
+        .team-purse { color: #4ade80; }
+
+        .log-area { flex-grow: 1; min-height: 150px; max-height: 250px; overflow-y: auto; background: #000; padding: 10px; border-radius: 5px; border: 1px solid #333; font-size: 0.8rem; color: #aaa; display: flex; flex-direction: column; gap: 5px; }
+        .log-entry.alert { color: #ffcc00; font-weight: bold; }
+        .log-entry.sold { color: #ff4757; font-weight: bold; font-size: 0.95rem; }
+
+        /* --- Right Column: Player Pool & Tabs --- */
+        .tabs { display: flex; border-bottom: 1px solid #333; margin-bottom: 15px; }
+        .tab { flex: 1; text-align: center; padding: 8px 5px; cursor: pointer; color: #aaa; font-size: 0.85rem; font-weight: bold; transition: 0.2s; white-space: nowrap; }
+        .tab:hover { color: #fff; }
+        .tab.active { color: #ff9800; border-bottom: 2px solid #ff9800; background: rgba(255,152,0,0.1); }
+
+        .upcoming-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 450px; padding-right: 5px; }
+        .upcoming-item { display: flex; justify-content: space-between; background-color: #222; padding: 10px; border-radius: 5px; border-left: 3px solid #555; font-size: 0.85rem; }
+        .upcoming-item.active { border-left-color: #ff9800; background-color: rgba(255, 152, 0, 0.15); box-shadow: 0 0 10px rgba(255,152,0,0.2); }
+        .role-badge { font-size: 0.65rem; background: #333; padding: 2px 6px; border-radius: 4px; color: #aaa; margin-top: 3px; display: inline-block; }
+        .role-header { padding: 6px 10px; background: #333; color: #ff9800; font-weight: bold; font-size: 0.8rem; margin-top: 10px; border-radius: 4px; border-left: 3px solid #ff9800; }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1 style="margin-bottom: 20px; font-size: 3rem; color: #fff;">🏏 Midnight Auction</h1>
+        <p style="margin-bottom: 40px; color: #aaa;">Turn up your volume!</p>
+        <button class="start-btn-massive" onclick="startGame()">Enter Auction Room</button>
+    </div>
+
+    <header>
+        <div>Playing as: <strong style="color:#eab308; font-size: 1.2rem;">CSK</strong></div>
+        <div class="purse-info">Your Purse: ₹<span id="my-purse">120.00</span> Cr</div>
+    </header>
+
+    <main id="main-ui">
+        <div class="player-card">
+            <div class="player-photo" id="display-photo">🏏</div>
+            <div class="player-name" id="display-name">Loading...</div>
+            <div class="player-details" id="display-details">...</div>
+            
+            <div class="bid-status">
+                <div>Current Bid</div>
+                <div class="current-bid-amount" id="display-bid">₹0.00 Cr</div>
+                <div class="highest-bidder" id="display-bidder">Waiting for bids...</div>
+                <div class="timer-bar-container"><div class="timer-bar" id="timer-bar"></div></div>
+            </div>
+
+            <div class="controls-row">
+                <button class="bid-btn skip-btn" id="skipBtn" onclick="skipPlayer()">Pass & Sim</button>
+                <button class="bid-btn" id="bidBtn" onclick="placeUserBid()">Bid +₹0.25 Cr</button>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+            <section class="card" style="flex: 1;">
+                <div class="card-header">📊 Remaining Purses</div>
+                <div class="team-list" id="purseList"></div>
+            </section>
+
+            <section class="card" style="flex: 1;">
+                <div class="card-header">📋 Action Log</div>
+                <div class="log-area" id="actionLog"></div>
+            </section>
+        </div>
+
+        <section class="card">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('pool', this)">Pool</div>
+                <div class="tab" onclick="switchTab('sold', this)">Sold</div>
+                <div class="tab" onclick="switchTab('unsold', this)">Unsold</div>
+                <div class="tab" onclick="switchTab('myteam', this)">My Squad</div>
+            </div>
+            <div class="upcoming-list" id="playerList"></div>
+        </section>
+    </main>
+
+    <script>
+        // --- 0. AUDIO SYNTHESIZER ENGINE ---
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            if (type === 'bid') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(900, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'hammer') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'unsold') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.5);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+            }
+        }
+
+        // --- 1. GAME DATA ---
+        const myTeam = 'CSK';
+        let teams = [
+            { id: 'CSK', purse: 120.00, isBot: false },
+            { id: 'MI', purse: 120.00, isBot: true }, { id: 'RCB', purse: 120.00, isBot: true },
+            { id: 'KKR', purse: 120.00, isBot: true }, { id: 'DC', purse: 120.00, isBot: true },
+            { id: 'PBKS', purse: 120.00, isBot: true }, { id: 'RR', purse: 120.00, isBot: true },
+            { id: 'SRH', purse: 120.00, isBot: true }, { id: 'GT', purse: 120.00, isBot: true },
+            { id: 'LSG', purse: 120.00, isBot: true }
+        ];
+
+        // Players dynamically added from the official 2024 IPL Auction List
+        let players = [
+            { name: "Rilee Rossouw", role: "Batter", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Mohammad Waqar Salamkheil", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Harry Brook", role: "Batter", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Travis Head", role: "Batter", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Karun Nair", role: "Batter", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Manish Pandey", role: "Batter", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Rovman Powell", role: "Batter", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Steve Smith", role: "Batter", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Gerald Coetzee", role: "All-Rounder", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Pat Cummins", role: "All-Rounder", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Wanindu Hasaranga", role: "All-Rounder", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Daryl Mitchell", role: "All-Rounder", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Azmatullah Omarzai", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Harshal Patel", role: "All-Rounder", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Rachin Ravindra", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Shardul Thakur", role: "All-Rounder", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Chris Woakes", role: "All-Rounder", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "K.S. Bharat", role: "Wicketkeeper", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Josh Inglis", role: "Wicketkeeper", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Kusal Mendis", role: "Wicketkeeper", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Philip Salt", role: "Wicketkeeper", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Tristan Stubbs", role: "Wicketkeeper", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Lockie Ferguson", role: "Bowler", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Josh Hazlewood", role: "Bowler", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Alzarri Joseph", role: "Bowler", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Dilshan Madushanka", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Shivam Mavi", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Chetan Sakariya", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Mitchell Starc", role: "Bowler", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Jaydev Unadkat", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Umesh Yadav", role: "Bowler", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Akeal Hosein", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Mujeeb Rahman", role: "Bowler", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Adil Rashid", role: "Bowler", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Tabraiz Shamsi", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Ish Sodhi", role: "Bowler", base: 0.75, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Priyansh Arya", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Saurav Chuahan", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Shubham Dubey", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Rohan Kunnummal", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Angkrish Raghuvanshi", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Sameer Rizvi", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Manan Vohra", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Raj Angad Bawa", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Shahrukh Khan", role: "All-Rounder", base: 0.40, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Mohd. Arshad Khan", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Sarfaraz Khan", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Arshin Kulkarni", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Viwant Sharma", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Atit Sheth", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Hrithik Shokeen", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Ramandeep Singh", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Ricky Bhui", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Tom Kohler-Cadmore", role: "Wicketkeeper", base: 0.40, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Kumar Kushagra", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Urvil Patel", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Vishnu Solanki", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Rasikh Dar", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Yash Dayal", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Sushant Mishra", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Ishan Porel", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Akash Singh", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Kartik Tyagi", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Kuldip Yadav", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Murgan Ashwin", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Shreyas Gopal", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Pulkit Narang", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "M Siddharth", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Shiva Singh", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Manav Suthar", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 24]
+{ name: "Finn Allen", role: "Batter", base: 0.75, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Alick Athanaze", role: "Batter", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Mark Chapman", role: "Batter", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Samuel Hain", role: "Batter", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Reeza Hendricks", role: "Batter", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Brandon King", role: "Batter", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Colin Munro", role: "Batter", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Sherfane Rutherford", role: "Batter", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Ashton Turner", role: "Batter", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Rassie Van Der Dussen", role: "Batter", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "James Vince", role: "Batter", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Ibrahim Zadran", role: "Batter", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Najibullah Zadran", role: "Batter", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Sean Abbott", role: "All-Rounder", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Ashton Agar", role: "All-Rounder", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Wesley Agar", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Qais Ahamad", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Rehan Ahmed", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Fabian Allen", role: "All-Rounder", base: 0.75, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Charith Asalanka", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Michael Bracewell", role: "All-Rounder", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Brydon Carse", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Tom Curran", role: "All-Rounder", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Ben Cutting", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Matthew Forde", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "George Garton", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Jason Holder", role: "All-Rounder", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "George Linde", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Keshav Maharaj", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Wiaan Mulder", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Mohammad Nabi", role: "All-Rounder", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "James Neesham", role: "All-Rounder", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Jamie Overton", role: "All-Rounder", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Keemo Paul", role: "All-Rounder", base: 0.75, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Dwaine Pretorius", role: "All-Rounder", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Daniel Sams", role: "All-Rounder", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Dasun Shanaka", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Matthew Short", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Odean Smith", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Hanuma Vihari", role: "All-Rounder", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "David Willey", role: "All-Rounder", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Sam Billings", role: "Wicketkeeper", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Johnson Charles", role: "Wicketkeeper", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Ben Duckett", role: "Wicketkeeper", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Shai Hope", role: "Wicketkeeper", base: 0.75, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Varun Aaron", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Fareed Ahmad", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Taskin Ahmed", role: "Bowler", base: 0.75, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Gus Atkinson", role: "Bowler", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Dushmanta Chameera", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Ben Dwarshuis", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Richard Gleeson", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Matt Henry", role: "Bowler", base: 0.75, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Md Shoriful Islam", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Kyle Jamieson", role: "Bowler", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Spencer Johnson", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Chris Jordan", role: "Bowler", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Siddharth Kaul", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Lahiru Kumara", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Obed Mccoy", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Riley Meredith", role: "Bowler", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Tymal Mills", role: "Bowler", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Adam Milne", role: "Bowler", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Lance Morris", role: "Bowler", base: 0.75, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Blessing Muzarabani", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Richard Ngarava", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Wayne Parnell", role: "Bowler", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Mustafizur Rahman", role: "Bowler", base: 2.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Jhye Richardson", role: "Bowler", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Ollie Robinson", role: "Bowler", base: 0.75, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "George Scrimshaw", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Tim Southee", role: "Bowler", base: 1.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Barinder Sran", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Billy Stanlake", role: "Bowler", base: 0.75, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 26]
+{ name: "Olly Stone", role: "Bowler", base: 0.75, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Oshane Thomas", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Nuwan Thushara", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Sandeep Warrier", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Lizaad Williams", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Luke Wood", role: "Bowler", base: 0.50, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Dinesh Bana", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Swastik Chhikara", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Rajat Dey", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Abhimanyu Easwaran", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Rithik Easwaran", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Chirag Gandhi", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Nikhil Gangta", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Sudip Gharami", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Ansh Gosai", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Azim Kazi", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Amandeep Khare", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Anot Kumar", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Bhupen Lalwani", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Pukhraj Mann", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Tanmay Mishra", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Salman Nizar", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Priyank Panchal", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Akshat Raghuwanshi", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Ekant Sen", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Subhranshu Senapati", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Naushad Shaikh", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Dhruv Shorey", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Himmat Singh", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Virat Singh", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Shashank Singh", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Sumeet Verma", role: "Batter", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "P A Abdul", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Murugan Abhishek", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Atharva Ankolekar", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Baba Aparajith", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Jass Inder Baidwan", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Corbin Bosch", role: "All-Rounder", base: 0.30, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Rahul Buddhi", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Vaisakh Chandran", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Writtick Chatterjee", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Raj Chaudhary", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Ravi Chauhan", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Ashwin Das", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Aarya Desai", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Vineet Dhankhar", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Naman Dhir", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Harsh Dubey", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Prerit Dutta", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Jake Fraser-Mogurk", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Shubhang Hegde", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Benny Howell", role: "All-Rounder", base: 0.40, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Saransh Jain", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Duan Jansen", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Mohammad Kaif", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Anshul Kamboj", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Aman Khan", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Mohd Arslan Khan", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Musheer Khan", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Tanush Kotian", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Sumit Kumar", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Manvanth Kumar", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Saurabh Kumar", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Dev Lakra", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Nasir Lone", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Kaushik Maity", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Divij Mehra", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Mani Sankar Mura Singh", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Abid Mushtaq", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Kamlesh Nagarkoti", role: "All-Rounder", base: 0.30, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Sanjay Pahal", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Jitender Pal", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Saumy Pandey", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Ansh Patel", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 28]
+{ name: "Sairaj Patil", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Pradosh Paul", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Shubham Singh Pundir", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Atal", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Abhimanyusingh Rajput", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Mohit Rathee", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Ninad Rathva", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Rohit Rayudu", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Aniketh Reddy", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Mohit Redkar", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Jalaj Saxena", role: "All-Rounder", base: 0.40, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Akash Sengupta", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Ashutosh Sharma", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Shivalik Sharma", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Suryansh Shedge", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Aradhya Shukla", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Utkarsh Singh", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Vishwanath Pratap Singh", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Shashank Singh", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Swapnil Singh", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Prenelan Subrayen", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Ravi Teja", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Tanay Thyagarajan", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Akash Vashisht", role: "All-Rounder", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "David Wiese", role: "All-Rounder", base: 1.00, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Mohit Ahlawat", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "G Ajitesh", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Avanish Rao Aravelly", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "L R Chethan", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Gourav Choudhary", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Harvik Desai", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Shakir Gandhi", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Sumit Ghadigaonkar", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Baba Indrajith", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Bhagmender Lather", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Anmol Malhotra", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Robin Minz", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Darshan Misal", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Nikhil Naik", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Prasad Pawar", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Mahesh Pithiya", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "William Salzmann", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Bipin Saurabh", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "B R Sharath", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "K L Shrijith", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Avneesh Sudha", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 30]
+{ name: "Basil Thampi", role: "Bowler", base: 0.30, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Aditya Tare", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Nihal Ullal", role: "Wicketkeeper", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "K M Asif", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Mohit Avasthi", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Ottneil Baartman", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Waseem Bashir", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Sachin Bhosale", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Devendra Singh Bora", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Gurnoor Singh Brar", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Nandre Burger", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Saurabh Dubey", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Mrinmoy Dutta", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Vishal Godara", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Money Grewal", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Arpit Guleria", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Mukhtar Hussain", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Sakib Hussain", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Shamar Joseph", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Mohammed Kaif", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Shubham Kapse", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Devang Karamta", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Kulwant Khejroliya", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Ravi Kumar", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Ashwani Kumar", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Raj Limbani", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Kwena Maphaka", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Lukman Hussain Meriwala", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Venkatesh Muralidhara", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "William O'Rourke", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Rakshan Readdi", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Manish Reddy", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Monish Reddy", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Akhin Sathar", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Divesh Sharma", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Ashok Sharma", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Abhilash Shetty", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Rahul Shukla", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Manit Singh", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Gurjapneet Singh", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Paul Van Meekeren", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Nitin Verma", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Chris Wood", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Gourav Yadav", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Lalit Yadav", role: "Bowler", base: 0.30, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Prithvi Raj Yarra", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Mujtaba Yousuf", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Shubham Agrawal", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Mustaq Beg", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "K.C Cariappa", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Ganesh Chaudhary", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Prince Choudhary", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Yuvraj Chudasama", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Jasmer Dhankhar", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Chintal Gandhi", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Allah Ghazanfar", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Goyal", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Shreyas Gurav", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Vishu Kashyap", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "S Midhun", role: "Bowler", base: 0.30, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Izharulhuq Naveed", role: "Bowler", base: 0.30, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Bhuwan Rohilla", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Shivam Sharma", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Digvesh Singh", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Jhathavedh Subramanyan", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Jagadeesha Suchith", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "B Surya", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null }, // [cite: 32]
+{ name: "Pankaj Yadav", role: "Bowler", base: 0.20, hype: 5, status: 'upcoming', price: null, team: null } // [cite: 32]
+        ];
+
+        // --- 2. GAME STATE ---
+        let currentIndex = 0;
+        let currentBid = 0;
+        let currentWinner = null;
+        let botIntentions = []; 
+        let hammerTimer;
+        let timeLeft = 5000; 
+        let botThinkingTimer;
+        let currentTab = 'pool';
+        let userPassed = false;
+
+        // --- 3. UI INITIALIZATION & UPDATES ---
+        function startGame() {
+            initAudio();
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('main-ui').style.display = 'grid';
+            updatePursesUI();
+            renderPlayerPool();
+            setTimeout(loadPlayer, 1000);
+        }
+
+        function updatePursesUI() {
+            const list = document.getElementById('purseList');
+            list.innerHTML = '';
+            let sortedTeams = [...teams].sort((a, b) => b.purse - a.purse);
+            sortedTeams.forEach(t => {
+                list.innerHTML += `<div class="team-row ${t.id === myTeam ? 'csk' : ''}">
+                    <span>${t.id}</span>
+                    <span class="team-purse">₹${t.purse.toFixed(2)} Cr</span>
+                </div>`;
+            });
+            let myPurseData = teams.find(t => t.id === myTeam);
+            document.getElementById('my-purse').innerText = myPurseData.purse.toFixed(2);
+        }
+
+        function logAction(msg, type = '') {
+            const log = document.getElementById('actionLog');
+            log.innerHTML += `<div class="log-entry ${type}">${msg}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function switchTab(tabName, element) {
+            currentTab = tabName;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            element.classList.add('active');
+            renderPlayerPool();
+        }
+
+        function renderPlayerPool() {
+            const list = document.getElementById('playerList');
+            list.innerHTML = '';
+            
+            let filteredPlayers = players.map((p, i) => ({ ...p, originalIndex: i }));
+
+            if (currentTab === 'sold') {
+                filteredPlayers = filteredPlayers.filter(p => p.status === 'sold');
+            } else if (currentTab === 'unsold') {
+                filteredPlayers = filteredPlayers.filter(p => p.status === 'unsold');
+            } else if (currentTab === 'myteam') {
+                filteredPlayers = filteredPlayers.filter(p => p.team === myTeam);
+            } else {
+                filteredPlayers = filteredPlayers.filter(p => p.status === 'upcoming');
+            }
+
+            if(filteredPlayers.length === 0) {
+                list.innerHTML = `<div style="text-align:center; padding:20px; color:#555; font-style:italic;">No players here yet.</div>`;
+                return;
+            }
+
+            if (currentTab === 'myteam') {
+                const roles = ['Batter', 'Wicketkeeper', 'All-Rounder', 'Bowler'];
+                roles.forEach(role => {
+                    const rolePlayers = filteredPlayers.filter(p => p.role === role);
+                    if (rolePlayers.length > 0) {
+                        list.innerHTML += `<div class="role-header">${role}s (${rolePlayers.length})</div>`;
+                        rolePlayers.forEach(p => {
+                            list.innerHTML += `
+                                <div class="upcoming-item" style="border-left-color: #eab308; margin-top: 4px;">
+                                    <div>
+                                        <div style="font-weight: bold; color: #fff;">${p.name}</div>
+                                    </div>
+                                    <div><span style="color:#4ade80; font-weight:bold;">₹${p.price.toFixed(2)} Cr</span></div>
+                                </div>
+                            `;
+                        });
+                    }
+                });
+            } else {
+                filteredPlayers.forEach((p) => {
+                    let isLive = (p.originalIndex === currentIndex);
+                    let statusClass = isLive ? 'active' : '';
+                    let rightText = '';
+                    let borderColor = '#555';
+                    
+                    if (p.status === 'sold') {
+                        rightText = `<span style="color:#4ade80; font-weight:bold;">${p.team} (₹${p.price.toFixed(2)})</span>`;
+                        borderColor = '#4ade80';
+                    } else if (p.status === 'unsold') {
+                        rightText = `<span style="color:#dc2626; font-weight:bold;">UNSOLD</span>`;
+                        borderColor = '#dc2626';
+                    } else if (isLive) {
+                        rightText = `<span style="color:#ffcc00; font-weight:bold;">LIVE</span>`;
+                        borderColor = '#ff9800';
+                    } else {
+                        rightText = `<span style="color:#aaa;">Base: ₹${p.base.toFixed(2)}</span>`;
+                    }
+
+                    list.innerHTML += `
+                        <div class="upcoming-item ${statusClass}" id="pool-item-${p.originalIndex}" style="border-left-color: ${borderColor}">
+                            <div>
+                                <div style="font-weight: bold; color: #fff;">${p.name}</div>
+                                <span class="role-badge">${p.role}</span>
+                            </div>
+                            <div>${rightText}</div>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        function triggerBidAnimation() {
+            const bidText = document.getElementById('display-bid');
+            bidText.style.transform = 'scale(1.2)';
+            setTimeout(() => { bidText.style.transform = 'scale(1)'; }, 100);
+        }
+
+        // --- 4. AUCTION MECHANICS ---
+        function loadPlayer() {
+            if (currentIndex >= players.length) {
+                document.getElementById('display-name').innerText = "Auction Over!";
+                document.getElementById('display-photo').innerText = "🏆";
+                document.getElementById('bidBtn').style.display = 'none';
+                document.getElementById('skipBtn').style.display = 'none';
+                return;
+            }
+
+            const p = players[currentIndex];
+            currentBid = p.base;
+            currentWinner = null;
+            timeLeft = 5000;
+            userPassed = false;
+
+            document.getElementById('display-name').innerText = p.name;
+            document.getElementById('display-details').innerText = `${p.role} • Base Price: ₹${p.base.toFixed(2)} Cr`;
+            document.getElementById('display-bid').innerText = `₹${currentBid.toFixed(2)} Cr`;
+            document.getElementById('display-bidder').innerText = "Awaiting opening bid...";
+            document.getElementById('display-bidder').style.color = "#aaa";
+            document.getElementById('timer-bar').style.width = '100%';
+
+            document.getElementById('skipBtn').disabled = false;
+            document.getElementById('bidBtn').disabled = false;
+
+            renderPlayerPool();
+            logAction(`--- ${p.name} is on the block! Base: ₹${p.base}Cr ---`, 'alert');
+            
+            calculateBotIntentions(p);
+            resetHammer();
+            triggerBotLogic();
+        }
+
+        function calculateBotIntentions(player) {
+            botIntentions = [];
+            teams.forEach(team => {
+                if(team.isBot) {
+                    if (Math.random() > 0.2) { 
+                        let maxValuation = player.base + (Math.random() * player.hype * 1.5);
+                        maxValuation = Math.min(maxValuation, team.purse); 
+                        botIntentions.push({ id: team.id, maxBid: maxValuation });
+                    }
+                }
+            });
+        }
+
+        // --- 5. THE BIDDING ENGINE ---
+        function placeBid(teamId) {
+            let teamData = teams.find(t => t.id === teamId);
+            let increment = currentBid < 2.00 ? 0.20 : 0.25; 
+            let newBid = currentBid + increment;
+
+            if (teamData.purse >= newBid) {
+                currentBid = newBid;
+                currentWinner = teamId;
+
+                playSound('bid');
+                triggerBidAnimation();
+
+                document.getElementById('display-bid').innerText = `₹${currentBid.toFixed(2)} Cr`;
+                document.getElementById('display-bidder').innerText = `Current Highest: ${teamId}`;
+                document.getElementById('display-bidder').style.color = teamId === 'CSK' ? '#eab308' : '#4ade80';
+                
+                logAction(`🏏 ${teamId} bids ₹${currentBid.toFixed(2)} Cr`);
+                
+                resetHammer();
+            }
+        }
+
+        function placeUserBid() {
+            if (currentWinner === 'CSK' || userPassed) return; 
+            
+            let myPurseData = teams.find(t => t.id === myTeam);
+            let increment = currentBid < 2.00 ? 0.20 : 0.25;
+            
+            if (myPurseData.purse >= (currentBid + increment)) {
+                placeBid('CSK');
+            } else {
+                alert("You don't have enough purse left!");
+            }
+        }
+
+        function skipPlayer() {
+            userPassed = true;
+            document.getElementById('bidBtn').disabled = true;
+            document.getElementById('skipBtn').disabled = true;
+            
+            logAction(`⏩ CSK Passed. Auto-simulating remaining bids...`, 'alert');
+
+            clearInterval(hammerTimer);
+            clearTimeout(botThinkingTimer);
+            document.getElementById('timer-bar').style.width = '0%';
+
+            let activeBots = botIntentions.map(b => {
+                let t = teams.find(team => team.id === b.id);
+                return { id: b.id, maxBid: Math.min(b.maxBid, t.purse) };
+            }).filter(b => b.maxBid > currentBid).sort((a, b) => b.maxBid - a.maxBid);
+
+            if (activeBots.length > 0) {
+                let winner = activeBots[0];
+                let runnerUp = activeBots.length > 1 ? activeBots[1] : null;
+
+                if (runnerUp && runnerUp.maxBid > currentBid) {
+                    let simPrice = runnerUp.maxBid + 0.25;
+                    simPrice = Math.min(simPrice, winner.maxBid); 
+                    simPrice = Math.ceil(simPrice * 4) / 4; 
+                    currentBid = simPrice;
+                    currentWinner = winner.id;
+                } else if (!currentWinner) {
+                    currentWinner = winner.id;
+                } else if (currentWinner !== winner.id) {
+                    currentBid += (currentBid < 2.00 ? 0.20 : 0.25);
+                    currentWinner = winner.id;
+                }
+            }
+
+            if (currentWinner) {
+                document.getElementById('display-bid').innerText = `₹${currentBid.toFixed(2)} Cr`;
+                document.getElementById('display-bidder').innerText = `Highest Bid: ${currentWinner}`;
+                document.getElementById('display-bidder').style.color = '#4ade80';
+            }
+
+            setTimeout(() => {
+                sellPlayer();
+            }, 1000);
+        }
+
+        function triggerBotLogic() {
+            clearTimeout(botThinkingTimer);
+            let thinkTime = Math.random() * 1500 + 800; 
+
+            botThinkingTimer = setTimeout(() => {
+                let willingBots = botIntentions.filter(bot => 
+                    bot.maxBid > currentBid + 0.25 && currentWinner !== bot.id
+                );
+
+                if (willingBots.length > 0 && !userPassed) {
+                    let randomBot = willingBots[Math.floor(Math.random() * willingBots.length)];
+                    placeBid(randomBot.id);
+                }
+
+                if (timeLeft > 0 && !userPassed) { triggerBotLogic(); }
+            }, thinkTime);
+        }
+
+        // --- 6. THE HAMMER (TIMER) ---
+        function resetHammer() {
+            if(userPassed) return; 
+
+            clearInterval(hammerTimer);
+            timeLeft = 5000; 
+            
+            document.getElementById('bidBtn').disabled = (currentWinner === 'CSK');
+
+            hammerTimer = setInterval(() => {
+                timeLeft -= 50; 
+                let percentage = (timeLeft / 5000) * 100;
+                document.getElementById('timer-bar').style.width = `${Math.max(percentage, 0)}%`;
+
+                if (timeLeft <= 0) {
+                    clearInterval(hammerTimer);
+                    clearTimeout(botThinkingTimer);
+                    sellPlayer();
+                }
+            }, 50);
+        }
+
+        function sellPlayer() {
+            if (currentWinner) {
+                playSound('hammer');
+                logAction(`🔨 SOLD! ${players[currentIndex].name} to ${currentWinner} for ₹${currentBid.toFixed(2)} Cr`, 'sold');
+                
+                let winnerIndex = teams.findIndex(t => t.id === currentWinner);
+                teams[winnerIndex].purse -= currentBid;
+                
+                players[currentIndex].status = 'sold';
+                players[currentIndex].price = currentBid;
+                players[currentIndex].team = currentWinner;
+                
+                updatePursesUI();
+            } else {
+                playSound('unsold');
+                logAction(`❌ UNSOLD: ${players[currentIndex].name}`, 'alert');
+                players[currentIndex].status = 'unsold';
+            }
+
+            renderPlayerPool();
+            currentIndex++;
+            setTimeout(loadPlayer, 2500); // Wait a bit before next player
+        }
+
+    </script>
+</body>
+</html>
