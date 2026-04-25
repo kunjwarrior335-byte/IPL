@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CricStats Pro + Player Cards</title>
+    <style>
+        :root {
+            --cb-green: #02a17b;
+            --cb-dark: #1b2124;
+            --cb-bg: #101416;
+            --cb-card: #242d32;
+            --text-blue: #42a5f5;
+            --text-gray: #b0bec5;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background: var(--cb-bg); color: white; margin: 0; }
+        .app { width: 100%; max-width: 500px; background: var(--cb-dark); min-height: 100vh; margin: auto; position: relative; }
+        
+        header { background: var(--cb-green); padding: 15px; font-weight: bold; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+
+        .card { background: var(--cb-card); margin: 12px; padding: 15px; border-radius: 10px; }
+        
+        /* Setup Inputs */
+        input, select { width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #444; background: #111; color: white; box-sizing: border-box; }
+        .setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        
+        /* Game UI */
+        #game-ui { display: none; }
+        .score-big { font-size: 2.5rem; font-weight: bold; margin: 10px 0; }
+        .player-row { display: flex; justify-content: space-between; padding: 10px; background: #1a2327; margin: 5px 0; border-radius: 5px; cursor: pointer; border-left: 3px solid transparent; }
+        .player-row:hover { border-left-color: var(--text-blue); background: #2c3e50; }
+        .active-strike { border-left-color: var(--cb-green); background: #1e3a34; }
+
+        /* Modal for Stats */
+        #stats-modal { 
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 80%; max-width: 350px; background: #fff; color: #333; padding: 20px; 
+            border-radius: 15px; z-index: 100; box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+        #overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 90; }
+
+        .controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 10px; position: sticky; bottom: 0; background: var(--cb-dark); }
+        button { padding: 12px 5px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; color: white; }
+        .btn-run { background: #455a64; }
+        .btn-green { background: var(--cb-green); }
+        .btn-red { background: #d32f2f; grid-column: span 2; }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <header>CRIC-SCORER PRO</header>
+
+    <div id="setup-ui">
+        <div class="card">
+            <h3>Team Rosters</h3>
+            <div class="setup-grid">
+                <div>
+                    <input type="text" id="t1Name" placeholder="Batting Team Name">
+                    <div id="t1Players"></div>
+                </div>
+                <div>
+                    <input type="text" id="t2Name" placeholder="Bowling Team Name">
+                    <div id="t2Players"></div>
+                </div>
+            </div>
+            <button onclick="startMatch()" style="width:100%; padding:15px; margin-top:15px; background:var(--cb-green);">START MATCH</button>
+        </div>
+    </div>
+
+    <div id="game-ui">
+        <div class="card">
+            <div id="matchHeader" style="color:var(--text-blue); font-size:0.8rem; margin-bottom:5px;"></div>
+            <div class="score-big"><span id="runs">0</span> - <span id="wkts">0</span> <small style="font-size:1.2rem; color:var(--text-gray)">(<span id="overs">0.0</span>)</small></div>
+            
+            <div style="font-size:0.8rem; color:var(--text-gray); margin-bottom:10px;">Click player for detailed stats</div>
+            
+            <div id="batter1" class="player-row" onclick="showStats('striker')">
+                <span id="p1Name">Striker</span> <span id="p1Score">0(0)</span>
+            </div>
+            <div id="batter2" class="player-row" onclick="showStats('nonStriker')">
+                <span id="p2Name">Non-Striker</span> <span id="p2Score">0(0)</span>
+            </div>
+            
+            <div class="player-row" style="margin-top:20px; background:#101416;" onclick="showStats('bowler')">
+                <span>🏃‍♂️ <span id="bowlName">Bowler</span></span> <span id="bowlFigs">0-0 (0.0)</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-run" onclick="handleRun(0)">0</button>
+            <button class="btn-run" onclick="handleRun(1)">1</button>
+            <button class="btn-run" onclick="handleRun(2)">2</button>
+            <button class="btn-run" onclick="handleRun(3)">3</button>
+            <button class="btn-green" onclick="handleRun(4)">4</button>
+            <button class="btn-green" onclick="handleRun(6)">6</button>
+            <button class="btn-run" onclick="extra('WD')">WD</button>
+            <button class="btn-run" onclick="extra('NB')">NB</button>
+            <button class="btn-red" onclick="takeWicket()">WICKET</button>
+            <button class="btn-run" style="grid-column: span 2;" onclick="swapStrike()">SWAP STRIKE</button>
+        </div>
+    </div>
+</div>
+
+<div id="overlay" onclick="closeModal()"></div>
+<div id="stats-modal">
+    <h2 id="modalName">Player Name</h2>
+    <div id="modalData" style="line-height: 1.6;"></div>
+    <button onclick="closeModal()" style="margin-top:20px; width:100%; padding:10px; background:#333; color:white; border:none; border-radius:5px;">CLOSE</button>
+</div>
+
+<script>
+    // Database for player stats
+    let playersData = {};
+    let strikerId, nonStrikerId, bowlerId;
+    let matchRuns = 0, matchWkts = 0, matchBalls = 0;
+
+    // Generate Inputs
+    const t1P = document.getElementById('t1Players');
+    const t2P = document.getElementById('t2Players');
+    for(let i=1; i<=3; i++) { // For demo, we use 3 players each. You can change to 11.
+        t1P.innerHTML += `<input type="text" class="t1-p" placeholder="Batsman ${i}" value="B${i}">`;
+        t2P.innerHTML += `<input type="text" class="t2-p" placeholder="Bowler ${i}" value="Bowl${i}">`;
+    }
+
+    function startMatch() {
+        const t1Inputs = document.querySelectorAll('.t1-p');
+        const t2Inputs = document.querySelectorAll('.t2-p');
+        
+        t1Inputs.forEach(inp => { playersData[inp.value] = { r:0, b:0, f4:0, s6:0, ov:0, br:0, bw:0 }; });
+        t2Inputs.forEach(inp => { playersData[inp.value] = { r:0, b:0, f4:0, s6:0, ov:0, br:0, bw:0 }; });
+
+        strikerId = t1Inputs[0].value;
+        nonStrikerId = t1Inputs[1].value;
+        bowlerId = t2Inputs[0].value;
+
+        document.getElementById('matchHeader').innerText = `${document.getElementById('t1Name').value} vs ${document.getElementById('t2Name').value}`;
+        document.getElementById('setup-ui').style.display = 'none';
+        document.getElementById('game-ui').style.display = 'block';
+        updateUI();
+    }
+
+    function handleRun(n) {
+        matchRuns += n;
+        matchBalls++;
+        
+        playersData[strikerId].r += n;
+        playersData[strikerId].b += 1;
+        if(n === 4) playersData[strikerId].f4++;
+        if(n === 6) playersData[strikerId].s6++;
+
+        playersData[bowlerId].br += n;
+        playersData[bowlerId].ov += 1;
+
+        if(n % 2 !== 0) swapStrike();
+        checkOver();
+        updateUI();
+    }
+
+    function extra(type) {
+        matchRuns += 1;
+        playersData[bowlerId].br += 1;
+        updateUI();
+    }
+
+    function takeWicket() {
+        matchWkts++;
+        matchBalls++;
+        playersData[strikerId].b += 1;
+        playersData[bowlerId].bw += 1;
+        playersData[bowlerId].ov += 1;
+        
+        if(matchWkts < 3) { // Adjusted to match demo roster size
+            strikerId = prompt("New Batsman Name:");
+            if(!playersData[strikerId]) playersData[strikerId] = { r:0, b:0, f4:0, s6:0, ov:0, br:0, bw:0 };
+        }
+        checkOver();
+        updateUI();
+    }
+
+    function checkOver() {
+        if(matchBalls > 0 && matchBalls % 6 === 0) {
+            swapStrike();
+            let newB = prompt("New Bowler Name:");
+            if(!playersData[newB]) playersData[newB] = { r:0, b:0, f4:0, s6:0, ov:0, br:0, bw:0 };
+            bowlerId = newB;
+        }
+    }
+
+    function swapStrike() {
+        [strikerId, nonStrikerId] = [nonStrikerId, strikerId];
+        updateUI();
+    }
+
+    function updateUI() {
+        document.getElementById('runs').innerText = matchRuns;
+        document.getElementById('wkts').innerText = matchWkts;
+        document.getElementById('overs').innerText = `${Math.floor(matchBalls/6)}.${matchBalls%6}`;
+        
+        document.getElementById('p1Name').innerText = strikerId + "*";
+        document.getElementById('p2Name').innerText = nonStrikerId;
+        document.getElementById('p1Score').innerText = `${playersData[strikerId].r}(${playersData[strikerId].b})`;
+        document.getElementById('p2Score').innerText = `${playersData[nonStrikerId].r}(${playersData[nonStrikerId].b})`;
+        
+        document.getElementById('bowlName').innerText = bowlerId;
+        let bOv = `${Math.floor(playersData[bowlerId].ov/6)}.${playersData[bowlerId].ov%6}`;
+        document.getElementById('bowlFigs').innerText = `${playersData[bowlerId].bw}-${playersData[bowlerId].br} (${bOv})`;
+    }
+
+    function showStats(role) {
+        let name = (role === 'striker') ? strikerId : (role === 'nonStriker' ? nonStrikerId : bowlerId);
+        let data = playersData[name];
+        
+        document.getElementById('modalName').innerText = name;
+        document.getElementById('modalData').innerHTML = `
+            <strong>Batting:</strong><br>
+            Runs: ${data.r} | Balls: ${data.b}<br>
+            4s: ${data.f4} | 6s: ${data.s6}<br>
+            SR: ${data.b > 0 ? ((data.r/data.b)*100).toFixed(1) : "0.0"}<br><br>
+            <strong>Bowling:</strong><br>
+            Wickets: ${data.bw} | Runs Given: ${data.br}<br>
+            Overs: ${Math.floor(data.ov/6)}.${data.ov%6}
+        `;
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('stats-modal').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('stats-modal').style.display = 'none';
+    }
+</script>
+</body>
+</html>
