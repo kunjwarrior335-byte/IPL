@@ -72,7 +72,7 @@
 
         /* Modal specific styles */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-        .modal-content { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--accent-blue); width: 90%; max-width: 750px; max-height: 85vh; overflow-y: auto; box-shadow: 0 15px 30px rgba(0,0,0,0.5); }
+        .modal-content { background: var(--bg-card); padding: 25px; border-radius: 12px; border: 1px solid var(--accent-blue); width: 95%; max-width: 850px; max-height: 85vh; overflow-y: auto; box-shadow: 0 15px 30px rgba(0,0,0,0.5); }
         .close-btn { float: right; background: var(--agg-red); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
         .close-btn:hover { background: #b91c1c; }
         .summary-banner { background: #0f172a; padding: 15px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 1.1rem; margin-bottom: 20px; color: var(--safe-green); border: 1px dashed var(--border);}
@@ -82,7 +82,7 @@
 
 <div id="setup-screen">
     <div class="setup-card">
-        <h2>IPL CHASE SIMULATOR</h2>
+        <h2>IPL CHASE SIMULATOR 2026</h2>
         <p style="color: var(--text-secondary); margin-bottom: 20px;">Select Opponent to Start Chasing</p>
         <div id="team-buttons" class="team-grid"></div>
         <button class="btn btn-secondary" style="width: 100%; margin-top: 25px; padding: 12px; font-size: 0.9rem;" onclick="openOverallStatsModal()">🏆 VIEW OVERALL CAREER STATS</button>
@@ -101,6 +101,8 @@
             <div style="display:flex; justify-content:space-between; font-size: 0.8rem; font-weight:700;">
                 WIN PROBABILITY <span id="prob-txt">50%</span>
             </div>
+            <!-- Dynamic remaining math calculation displayed here -->
+            <div id="required-equation" style="font-size: 0.95rem; font-weight: 700; color: var(--orange-strike); margin-top: 6px; text-align: center; letter-spacing: 0.5px;"></div>
             <div class="prob-bar-bg"><div id="prob-fill" class="prob-bar-fill"></div></div>
         </div>
 
@@ -156,7 +158,7 @@
         <h2 style="color: var(--accent-blue); margin-bottom: 20px;">CURRENT MATCH STATS</h2>
         <table>
             <thead>
-                <tr><th>PLAYER</th><th>RUNS</th><th>BALLS</th><th>SR</th><th>AVG</th><th>4s</th><th>6s</th></tr>
+                <tr><th>PLAYER</th><th>RUNS</th><th>BALLS</th><th>SR</th><th>4s</th><th>6s</th></tr>
             </thead>
             <tbody id="detailed-stats-body"></tbody>
         </table>
@@ -170,7 +172,16 @@
         <div id="overall-wl" class="summary-banner"></div>
         <table>
             <thead>
-                <tr><th>PLAYER</th><th>RUNS</th><th>BALLS</th><th>SR</th><th>AVG</th><th>4s</th><th>6s</th></tr>
+                <tr>
+                    <th>PLAYER</th>
+                    <th>RUNS</th>
+                    <th>AVG</th>
+                    <th>SR</th>
+                    <th>50s</th>
+                    <th>100s</th>
+                    <th>4s</th>
+                    <th>6s</th>
+                </tr>
             </thead>
             <tbody id="overall-stats-body"></tbody>
         </table>
@@ -214,19 +225,20 @@ function loadCareerStats() {
     if (!stats) {
         stats = { matches: 0, won: 0, lost: 0, players: {} };
         USER_SQUAD.forEach(p => {
-            stats.players[p] = { R: 0, B: 0, f4: 0, f6: 0, outs: 0 };
+            stats.players[p] = { R: 0, B: 0, f4: 0, f6: 0, outs: 0, f50: 0, f100: 0 };
         });
         localStorage.setItem('iplChaseCareerStats', JSON.stringify(stats));
     }
-    // Safety check in case squad changed
     USER_SQUAD.forEach(p => {
-        if(!stats.players[p]) stats.players[p] = { R: 0, B: 0, f4: 0, f6: 0, outs: 0 };
+        if(!stats.players[p]) stats.players[p] = { R: 0, B: 0, f4: 0, f6: 0, outs: 0, f50: 0, f100: 0 };
+        if(stats.players[p].f50 === undefined) stats.players[p].f50 = 0;
+        if(stats.players[p].f100 === undefined) stats.players[p].f100 = 0;
     });
     return stats;
 }
 let careerStats = loadCareerStats();
 
-// Init UI
+// Init UI Team Selection
 const teamBox = document.getElementById('team-buttons');
 Object.keys(DATA).forEach(t => {
     let b = document.createElement('button');
@@ -343,6 +355,16 @@ function updateUI() {
     document.getElementById('rrr-val').innerText = bLeft > 0 ? (rNeeded / (bLeft/6)).toFixed(2) : "0";
     document.getElementById('crr-val').innerText = game.balls > 0 ? (game.score / (game.balls/6)).toFixed(2) : "0";
 
+    // Update Runs Remaining vs Deliveries Left Text Segment
+    const eqEl = document.getElementById('required-equation');
+    if (game.isFinished) {
+        eqEl.innerText = ""; 
+    } else if (rNeeded <= 0) {
+        eqEl.innerText = "Scores Level / Target Reached!";
+    } else {
+        eqEl.innerText = `${rNeeded} run${rNeeded > 1 ? 's' : ''} required from ${bLeft} ball${bLeft > 1 ? 's' : ''}`;
+    }
+
     let p = 100 - ((rNeeded / (bLeft + 1)) * 10) - (game.wickets * 6);
     p = Math.max(2, Math.min(98, Math.round(p)));
     document.getElementById('prob-txt').innerText = p + "%";
@@ -390,13 +412,13 @@ function checkEnd() {
     let loss = game.wickets >= 10 || game.balls >= 120;
     if ((win || loss) && !game.isFinished) {
         game.isFinished = true;
+        updateUI(); 
         document.getElementById('action-btns').classList.add('hidden');
         document.getElementById('selection-overlay').classList.add('hidden');
         document.getElementById('result-overlay').classList.remove('hidden');
         document.getElementById('result-msg').innerText = win ? "🏆 CHASE SUCCESSFUL!" : "💔 MATCH LOST BY " + (game.target - game.score) + " RUNS";
         document.getElementById('result-msg').style.color = win ? "var(--safe-green)" : "var(--agg-red)";
         
-        // SAVE TO CAREER STATS
         careerStats.matches++;
         if (win) careerStats.won++; else careerStats.lost++;
         
@@ -408,6 +430,9 @@ function checkEnd() {
             cPs.f4 += mPs.f4;
             cPs.f6 += mPs.f6;
             if (mPs.out) cPs.outs++;
+
+            if (mPs.R >= 100) cPs.f100++;
+            else if (mPs.R >= 50) cPs.f50++;
         });
         localStorage.setItem('iplChaseCareerStats', JSON.stringify(careerStats));
     }
@@ -422,14 +447,11 @@ function getRandom(items, weights) {
     }
 }
 
-// MATCH STATS MODAL
 function openStatsModal() {
     let html = "";
     USER_SQUAD.forEach(p => {
         let ps = game.playerStats[p];
         let sr = ps.B > 0 ? ((ps.R / ps.B) * 100).toFixed(2) : "0.00";
-        let avg = ps.out ? ps.R : "-"; 
-        
         let statusMarker = "";
         if (ps.out) statusMarker = "<span style='color: var(--agg-red); font-size: 0.75rem;'>(W)</span>";
         else if (game.batsmen.includes(p) && ps.B > 0) statusMarker = "<span style='color: var(--safe-green); font-size: 0.75rem;'>*</span>";
@@ -439,7 +461,6 @@ function openStatsModal() {
             <td style="color: var(--accent-blue); font-weight: 700;">${ps.R}</td>
             <td>${ps.B}</td>
             <td>${sr}</td>
-            <td>${avg}</td>
             <td>${ps.f4}</td>
             <td>${ps.f6}</td>
         </tr>`;
@@ -448,13 +469,11 @@ function openStatsModal() {
     document.getElementById('stats-modal').classList.remove('hidden');
 }
 
-// CAREER OVERALL STATS MODAL
 function openOverallStatsModal() {
     let html = "";
     USER_SQUAD.forEach(p => {
         let cPs = careerStats.players[p];
         let sr = cPs.B > 0 ? ((cPs.R / cPs.B) * 100).toFixed(2) : "0.00";
-        // Career average: Runs divided by times out. If 0 times out but batted, avg is total runs. If never batted, avg is '-'
         let avg = "-";
         if (cPs.outs > 0) avg = (cPs.R / cPs.outs).toFixed(2);
         else if (cPs.B > 0) avg = cPs.R + ".00";
@@ -462,15 +481,16 @@ function openOverallStatsModal() {
         html += `<tr>
             <td style="font-weight: 700;">${p}</td>
             <td style="color: #eab308; font-weight: 900;">${cPs.R}</td>
-            <td>${cPs.B}</td>
+            <td>${avg}</td>
             <td>${sr}</td>
-            <td style="font-weight: 700;">${avg}</td>
+            <td style="color: var(--safe-green); font-weight:700;">${cPs.f50}</td>
+            <td style="color: var(--orange-strike); font-weight:700;">${cPs.f100}</td>
             <td>${cPs.f4}</td>
             <td>${cPs.f6}</td>
         </tr>`;
     });
     
-    document.getElementById('overall-wl').innerHTML = `MATCHES PLAYED: <span style="color:white">${careerStats.matches}</span> &nbsp;|&nbsp; WON: <span style="color:white">${careerStats.won}</span> &nbsp;|&nbsp; LOST: <span style="color:white">${careerStats.lost}</span>`;
+    document.getElementById('overall-wl').innerHTML = `MATCHES: <span style="color:white">${careerStats.matches}</span> &nbsp;|&nbsp; WON: <span style="color:white">${careerStats.won}</span> &nbsp;|&nbsp; LOST: <span style="color:white">${careerStats.lost}</span>`;
     document.getElementById('overall-stats-body').innerHTML = html;
     document.getElementById('overall-modal').classList.remove('hidden');
 }
@@ -478,7 +498,11 @@ function openOverallStatsModal() {
 function resetCareerStats() {
     if (confirm("Are you sure you want to erase all tournament history?")) {
         localStorage.removeItem('iplChaseCareerStats');
-        careerStats = loadCareerStats();
+        careerStats = { matches: 0, won: 0, lost: 0, players: {} };
+        USER_SQUAD.forEach(p => {
+            careerStats.players[p] = { R: 0, B: 0, f4: 0, f6: 0, outs: 0, f50: 0, f100: 0 };
+        });
+        localStorage.setItem('iplChaseCareerStats', JSON.stringify(careerStats));
         closeModal('overall-modal');
         alert("Career stats reset successfully!");
     }
